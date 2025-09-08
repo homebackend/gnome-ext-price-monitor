@@ -25,9 +25,6 @@ export default class ExamplePreferences extends ExtensionPreferences {
     // Refresh interval
     page.add(this._create_refresh_interval_options());
 
-    // Hide unit
-    page.add(this._create_hide_unit_options());
-
     // Panel position
     page.add(this._create_panel_position_options());
 
@@ -88,20 +85,6 @@ export default class ExamplePreferences extends ExtensionPreferences {
 
     refreshGroup.add(refreshRow);
     return refreshGroup;
-  }
-
-  _create_hide_unit_options() {
-    const hideUnitGroup = new Adw.PreferencesGroup({ title: "Display Options" });
-
-    const hideUnitRow = new Adw.SwitchRow({
-      title: "Hide Unit",
-      subtitle: "Toggle to hide or show the weight unit in the display.",
-      active: this._settings.get_boolean("hide-unit"),
-    });
-    this._settings.bind("hide-unit", hideUnitRow, "active", Gio.SettingsBindFlags.DEFAULT);
-
-    hideUnitGroup.add(hideUnitRow);
-    return hideUnitGroup;
   }
 
   _create_panel_position_options() {

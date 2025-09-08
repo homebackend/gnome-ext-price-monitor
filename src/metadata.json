@@ -1,8 +1,8 @@
 {
-  "name": "Gold Price Monitor",
-  "description": "A Gnome extension helps you tracking gold price in realtime. Service provider: goldprice.org",
-  "uuid": "Gold_Price_Monitor@wotmshuaisi_github",
+  "name": "Price Monitor",
+  "description": "A Gnome extension helps you tracking gold and silver price in realtime. Service provider: goldprice.org",
+  "uuid": "price-monitor-neerajcd@gmail.com",
   "shell-version": ["45", "46", "47", "48"],
-  "url": "https://github.com/wotmshuaisi/goldpricemonitor",
-  "settings-schema": "org.gnome.shell.extensions.gold-price-monitor"
+  "url": "https://github.com/homebackend/gnome-ext-price-monitor",
+  "settings-schema": "org.gnome.shell.extensions.price-monitor"
 }

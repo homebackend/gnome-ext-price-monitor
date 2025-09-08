@@ -1,4 +1,3 @@
-*.sh
-release
-*.zip
-test.js
+dist
+node_modules
+package-lock.json

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
-  <schema id="org.gnome.shell.extensions.gold-price-monitor" path="/org/gnome/shell/extensions/gold_price_monitor/">
+  <schema id="org.gnome.shell.extensions.price-monitor" path="/org/gnome/shell/extensions/price_monitor/">
     <key name="weight-unit" type="i">
       <default>0</default>
       <summary>Weight Unit</summary>
@@ -12,12 +12,9 @@
       <description>Gold Currency.</description>
     </key>
     <key name="refresh-interval" type="i">
-      <default>60</default>
+      <default>10</default>
       <summary>Refresh interval in Minutes</summary>
       <description>Refresh interval in Minutes.</description>
-    </key>
-    <key name="hide-unit" type="b">
-      <default>false</default>
     </key>
     <key name="panel-position" type="i">
       <default>2</default>
