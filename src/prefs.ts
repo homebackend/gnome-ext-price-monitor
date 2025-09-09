@@ -36,17 +36,18 @@ export default class ExamplePreferences extends ExtensionPreferences {
   _create_weight_unit_options() {
     const weightGroup = new Adw.PreferencesGroup({ title: "Weight Unit" });
 
-    const weightModel = new Gtk.StringList();
-    ["Ounce(℥)", "Gram(g)", "Kilogram(kg)", "Tola"].forEach((unit) => weightModel.append(unit));
+    ['gold', 'silver'].forEach(k => {
+      const weightModel = new Gtk.StringList();
+      ["Ounce(℥)", "Gram(g)", "Kilogram(kg)", "Tola"].forEach((unit) => weightModel.append(unit));
 
-    const weightRow = new Adw.ComboRow({
-      title: "Select Weight Unit",
-      subtitle: "Choose the unit for gold weight.",
-      model: weightModel,
+      const weightRow = new Adw.ComboRow({
+        title: "Select Weight Unit",
+        subtitle: `Choose the unit for ${k} weight.`,
+        model: weightModel,
+      });
+      this._settings.bind(`${k}-weight-unit`, weightRow, "selected", Gio.SettingsBindFlags.NO_SENSETIVITY);
+      weightGroup.add(weightRow);
     });
-    this._settings.bind("weight-unit", weightRow, "selected", Gio.SettingsBindFlags.NO_SENSETIVITY);
-
-    weightGroup.add(weightRow);
 
     return weightGroup;
   }

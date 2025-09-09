@@ -77,7 +77,8 @@ const Indicator = GObject.registerClass(
     }
 
     _get_unit() {
-      switch (this._get_setting_val("weight-unit")) {
+      const key = (this._au_turn ? 'gold' : 'silver') + '-weight-unit';
+      switch (this._get_setting_val(key)) {
         case 0:
           return "℥";
         case 1:
@@ -109,8 +110,8 @@ const Indicator = GObject.registerClass(
       return request;
     }
 
-    _get_unit_price(price: number) {
-      switch (this._get_setting_val("weight-unit")) {
+    _get_unit_price(price: number, key: string) {
+      switch (this._get_setting_val(key + '-weight-unit')) {
         case 1:
           return price / Indicator.ounce_to_gram;
         case 2:
@@ -124,14 +125,22 @@ const Indicator = GObject.registerClass(
 
     _format_num(auval: number, agval: number) {
       const w = 2;
-      var s1 = auval.toFixed(w);
-      var s2 = agval.toFixed(w);
+      var s1 = Math.abs(auval).toFixed(w);
+      var s2 = Math.abs(agval).toFixed(w);
       const m = Math.max(s1.length, s2.length);
       return (this._au_turn ? s1 : s2).padEnd(m, ' ');
     }
 
     _format_num_unit(auval: number, agval: number) {
-      return this._format_num(this._get_unit_price(auval), this._get_unit_price(agval));
+      auval = this._get_unit_price(auval, 'gold');
+      agval = this._get_unit_price(agval, 'silver');
+      if (this._au_turn) {
+        agval = Math.max(auval, agval);
+      } else {
+        auval = Math.max(auval, agval);
+      }
+
+      return this._format_num(auval, agval);
     }
 
     _show_data() {
@@ -209,7 +218,7 @@ export default class GoldPriceIndicatorExtension extends Extension {
     this._indicator = new Indicator(this);
     this.addToPanel(this._settings.get_value("panel-position").unpack());
 
-    ["weight-unit", "currency", "refresh-interval", "panel-position"].forEach((key) => {
+    ["gold-weight-unit", "silver-weight-unit", "currency", "refresh-interval", "panel-position"].forEach((key) => {
       this._settings.connect(`changed::${key}`, () => {
         this.disable();
         this.enable();
