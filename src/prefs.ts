@@ -37,7 +37,7 @@ export default class ExamplePreferences extends ExtensionPreferences {
     const weightGroup = new Adw.PreferencesGroup({ title: "Weight Unit" });
 
     const weightModel = new Gtk.StringList();
-    ["Ounce(℥)", "Gram(g)", "Kilogram(kg)"].forEach((unit) => weightModel.append(unit));
+    ["Ounce(℥)", "Gram(g)", "Kilogram(kg)", "Tola"].forEach((unit) => weightModel.append(unit));
 
     const weightRow = new Adw.ComboRow({
       title: "Select Weight Unit",

@@ -84,6 +84,8 @@ const Indicator = GObject.registerClass(
           return "g";
         case 2:
           return "kg";
+        case 3:
+          return "tola";
       }
       return "℥";
     }
@@ -113,6 +115,8 @@ const Indicator = GObject.registerClass(
           return price / Indicator.ounce_to_gram;
         case 2:
           return (price / Indicator.ounce_to_gram) * 1000;
+        case 3:
+          return price * 3 / 8;
       }
 
       return price;
