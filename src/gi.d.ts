@@ -1,11 +1,6 @@
 // src/gi.d.ts
 declare module 'gi://Clutter' {
-  import Clutter from '@girs/clutter-1.0';
-  export = Clutter;
-}
-
-declare module 'gi://Clutter?version=1.0' {
-  import Clutter from '@girs/clutter-1.0';
+  import Clutter from '@girs/clutter-16';
   export = Clutter;
 }
 
@@ -20,12 +15,7 @@ declare module 'gi://Gio?version=2.0' {
 }
 
 declare module 'gi://St' {
-  import St from '@girs/st-1.0';
-  export = St;
-}
-
-declare module 'gi://St?version=1.0' {
-  import St from '@girs/st-1.0';
+  import St from '@girs/st-16';
   export = St;
 }
 
@@ -82,4 +72,9 @@ declare module 'gi://Adw' {
 declare module 'gi://Adw?version=1' {
   import Adw from '@girs/adw-1';
   export = Adw;
+}
+
+declare module 'gi://Gtk' {
+  import Gtk from '@girs/gtk-4.0';
+  export = Gtk;
 }

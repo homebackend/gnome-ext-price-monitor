@@ -1,6 +1,35 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
-  <schema id="org.gnome.shell.extensions.price-monitor" path="/org/gnome/shell/extensions/price_monitor/">
+  <schema id="org.gnome.shell.extensions.price-monitor"
+    path="/org/gnome/shell/extensions/price_monitor/">
+    <key name="enabled-source" type="s">
+      <default>'goldprice.org'</default>
+      <summary>Precious metal source</summary>
+      <description>Source to use for precious metals price data.</description>
+    </key>
+
+    <key name="gold-ownership" type="i">
+      <default>0</default>
+      <summary>Gold Ownership</summary>
+      <description>Amount of gold held by you.</description>
+    </key>
+    <key name="gold-ownership-unit" type="i">
+      <default>0</default>
+      <summary>Gold Weight Unit</summary>
+      <description>Gold Ownership Weight Unit.</description>
+    </key>
+
+    <key name="silver-ownership" type="i">
+      <default>0</default>
+      <summary>Silver Ownership</summary>
+      <description>Amount of silver held by you.</description>
+    </key>
+    <key name="silver-ownership-unit" type="i">
+      <default>0</default>
+      <summary>Silver Weight Unit</summary>
+      <description>Silver  Ownership Weight Unit.</description>
+    </key>
+
     <key name="gold-weight-unit" type="i">
       <default>0</default>
       <summary>Gold Weight Unit</summary>
@@ -11,18 +40,40 @@
       <summary>Silver Weight Unit</summary>
       <description>Silver Weight Unit.</description>
     </key>
-    <key name="currency" type="i">
+    <key name="platinum-weight-unit" type="i">
       <default>0</default>
+      <summary>Platinum Weight Unit</summary>
+      <description>Platinum Weight Unit.</description>
+    </key>
+    <key name="palladium-weight-unit" type="i">
+      <default>0</default>
+      <summary>Palladium Weight Unit</summary>
+      <description>Palladium Weight Unit.</description>
+    </key>
+    <key name="rhodium-weight-unit" type="i">
+      <default>0</default>
+      <summary>Rhodium Weight Unit</summary>
+      <description>Rhodium Weight Unit.</description>
+    </key>
+    <key name="currency" type="s">
+      <default>'USD'</default>
       <summary>Currency</summary>
-      <description>Gold Currency.</description>
+      <description>Choose the display price currency.</description>
     </key>
     <key name="refresh-interval" type="i">
       <default>10</default>
       <summary>Refresh interval in Minutes</summary>
-      <description>Refresh interval in Minutes.</description>
+      <description>Set how often to refresh price and other data.</description>
     </key>
     <key name="panel-position" type="i">
       <default>2</default>
+      <summary>Panel Position</summary>
+      <description>Select the position of the indicator on the panel.</description>
+    </key>
+    <key type="b" name="enable-debug-logging">
+      <default>false</default>
+      <summary>Enable Debug Logging</summary>
+      <description>Debug logging.</description>
     </key>
   </schema>
 </schemalist>

@@ -1,44 +1,55 @@
+import Gio from "gi://Gio";
 import GObject from "@girs/gobject-2.0";
 import St from "gi://St";
 import Clutter from "gi://Clutter";
 import GLib from "gi://GLib";
-import Soup from "gi://Soup";
 
 import { Extension, gettext as _ } from "resource:///org/gnome/shell/extensions/extension.js";
 import * as PanelMenu from "resource:///org/gnome/shell/ui/panelMenu.js";
 import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
-import * as Util from "resource:///org/gnome/shell/misc/util.js";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
-import * as Currencies from "./currencies.js";
+import { SourceMappings } from "./source.js";
+import { Fetcher } from "./fetcher.js";
+
+interface PriceData {
+  index: string;
+  name: string;
+  color: string;
+  price: number;
+  change: number;
+  pchange: number;
+};
+
+const MetalMappings = {
+  gold: { name: 'AU', color: '#FFD700' },
+  silver: { name: 'AG', color: '#C0C0C0' },
+  platinum: { name: 'PT', color: '#E5E4E2' },
+  palladium: { name: 'PD', color: '#B1B1B1' },
+  rhodium: { name: 'RH', color: '#D1D7D7' },
+};
 
 const Indicator = GObject.registerClass(
   class Indicator extends PanelMenu.Button {
     displayText = "...";
-    private _httpSession: Soup.Session;
     private _ext: Extension;
-    private static api_url: string = "https://data-asg.goldprice.org/dbXRates/";
+    private _settings: Gio.Settings;
     private static ounce_to_gram = 31.1034768;
-    private static goldColor = '#FFD700';
-    private static silverColor = '#C0C0C0';
     private lock: boolean;
     private price: St.Label;
     private lastUpdate: PopupMenu.PopupMenuItem;
     private refreshBtn: PopupMenu.PopupMenuItem;
     private backgroundTask: number;
     private showTask: number;
-    private _au_turn: boolean = true;
-    private _au_price: number = 0;
-    private _au_change: number = 0;
-    private _au_pchange: number = 0;
-    private _ag_price: number = 0;
-    private _ag_change: number = 0;
-    private _ag_pchange: number = 0;
+    private _fetcher: Fetcher | undefined;
+    private _turn: number;
+    private _priceData: PriceData[] = [];
 
-    constructor(ext: Extension) {
+    constructor(ext: Extension, settings: Gio.Settings) {
       super(0.0, _("Gold Price Indicator"));
-      this._httpSession = new Soup.Session();
       this._ext = ext;
+      this._settings = settings;
       this.lock = false;
+      this._turn = 0;
 
       // Components
       this.price = new St.Label({
@@ -60,6 +71,18 @@ const Indicator = GObject.registerClass(
       this.menu.addMenuItem(this.refreshBtn);
       this.menu.addMenuItem(settingsBtn);
       this.add_child(this.price);
+
+      ["enabled-source", "currency"].forEach((key) => {
+        this._settings!.connect(`changed::${key}`, () => {
+          this._fetch_data();
+        });
+      });
+      Object.keys(MetalMappings).forEach((key) => {
+        this._settings!.connect(`changed::${key}-weight-unit`, () => {
+          this._show_data();
+        });
+      });
+
       // Event loop
       this._fetch_data();
       this.backgroundTask = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, this._get_refresh_interval() * 60, () => {
@@ -72,85 +95,77 @@ const Indicator = GObject.registerClass(
       });
     }
 
-    _get_setting_val(key: string) {
-      return this._ext._settings.get_value(key).unpack();
+    private _get_refresh_interval(): number {
+      return this._settings.get_int('refresh-interval');
     }
 
-    _get_unit() {
-      const key = (this._au_turn ? 'gold' : 'silver') + '-weight-unit';
-      switch (this._get_setting_val(key)) {
-        case 0:
-          return "℥";
-        case 1:
-          return "g";
-        case 2:
-          return "kg";
-        case 3:
-          return "tola";
+    private _get_unit_price(price: number, key: string): number {
+      return this._get_unit_price_for_type(price, this._settings.get_int(key + '-weight-unit'));
+    }
+
+    private _get_unit_price_in_ounce(price: number, sourceType: number): number {
+      switch (sourceType) {
+        case 1: // Gram
+          return price * Indicator.ounce_to_gram;
+        case 2: // Kilo Gram
+          return (price * Indicator.ounce_to_gram) / 1000;
+        case 3: // Tola
+          return price / (3 / 8);
       }
-      return "℥";
+
+      return price;
     }
 
-    _get_currency() {
-      const cIdx = this._get_setting_val("currency");
-      return Currencies.list()[cIdx].unit;
-    }
-
-    _get_refresh_interval() {
-      return this._get_setting_val("refresh-interval");
-    }
-
-    _build_req() {
-      const url = `${Indicator.api_url}${this._get_currency()}`
-      let request = Soup.Message.new("GET", url);
-      request.request_headers.append("Cache-Control", "no-cache");
-      request.request_headers.append("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.6831.62 Safari/537.36");
-
-      this._log([url]); // debug
-      return request;
-    }
-
-    _get_unit_price(price: number, key: string) {
-      switch (this._get_setting_val(key + '-weight-unit')) {
-        case 1:
+    private _get_unit_price_from_ounce(price: number, destinationType: number): number {
+      switch (destinationType) {
+        case 1: // Gram
           return price / Indicator.ounce_to_gram;
-        case 2:
+        case 2: // Kilo Gram
           return (price / Indicator.ounce_to_gram) * 1000;
-        case 3:
+        case 3: // Tola
           return price * 3 / 8;
       }
 
       return price;
     }
 
-    _format_num(auval: number, agval: number) {
-      const w = 2;
-      var s1 = Math.abs(auval).toFixed(w);
-      var s2 = Math.abs(agval).toFixed(w);
-      const m = Math.max(s1.length, s2.length);
-      return (this._au_turn ? s1 : s2).padEnd(m, ' ');
-    }
-
-    _format_num_unit(auval: number, agval: number) {
-      auval = this._get_unit_price(auval, 'gold');
-      agval = this._get_unit_price(agval, 'silver');
-      if (this._au_turn) {
-        agval = Math.max(auval, agval);
-      } else {
-        auval = Math.max(auval, agval);
+    private _get_unit_price_for_type(price: number, destinationType: number, sourceType: number = 0): number {
+      if (sourceType == destinationType) {
+        return price;
       }
 
-      return this._format_num(auval, agval);
+      price = this._get_unit_price_in_ounce(price, sourceType);
+      price = this._get_unit_price_from_ounce(price, destinationType);
+      return price;
+    }
+
+    private _format_num(val: number): string {
+      const w = 2;
+      return Math.abs(val).toFixed(w);
+    }
+
+    private _format_num_unit(value: number, name: string, values: [number, string][]): string {
+      const strValue = this._format_num(this._get_unit_price(value, name));
+      const lengths = values.map(([v, n]) => this._format_num(this._get_unit_price(v, n)).length);
+      const maxLength = Math.max(...lengths);
+      return strValue.padEnd(maxLength, ' ');
     }
 
     _show_data() {
-      const prefix = this._au_turn ? 'AU' : 'AG'
-      const prefixColor = this._au_turn ? Indicator.goldColor : Indicator.silverColor;
-      const latest_price = this._format_num_unit(this._au_price, this._ag_price);
-      const latest_change = this._format_num_unit(this._au_change, this._ag_change);
-      const latest_pchange = this._format_num(this._au_pchange, this._ag_pchange);
-      const change = this._au_turn ? this._au_change : this._ag_change;
-      this._au_turn = !this._au_turn;
+      if (this._priceData.length == 0) {
+        return;
+      }
+
+      const index = this._turn % this._priceData.length;
+      const data = this._priceData[index];
+      this._log(['Switching to', data.name]);
+      const prefix = data.index;
+      const prefixColor = data.color;
+      const latest_price = this._format_num_unit(data.price, data.name, this._priceData.map(p => [p.price, p.name]));
+      const latest_change = this._format_num_unit(data.change, data.name, this._priceData.map(p => [p.change, p.name]));
+      const latest_pchange = this._format_num_unit(data.pchange, data.name, this._priceData.map(p => [p.pchange, p.name]));
+      const change = data.change;
+      this._turn = (this._turn + 1) % this._priceData.length;
 
       const color = change > 0 ? 'green' : 'red';
       const sign = change > 0 ? '+' : '-';
@@ -160,50 +175,97 @@ const Indicator = GObject.registerClass(
 
     _fetch_data() {
       if (this.lock) {
+        this._log(['Fetch in progress']);
         return;
       }
       this.lock = true;
-      let msg = this._build_req();
-      this._httpSession.send_and_read_async(msg, GLib.PRIORITY_DEFAULT, null, (_, response) => {
-        response = new TextDecoder("utf-8").decode(this._httpSession.send_and_read_finish(response).get_data());
 
-        if (msg.get_status() > 299) {
-          this._log(["Remote server error:", msg.get_status(), response]);
+      const enabledSource = this._settings.get_string('enabled-source');
+      const source = SourceMappings.get(enabledSource);
+      this._fetcher = new Fetcher(source!, this._log.bind(this));
+      this._fetcher.fetch(this._settings, (result => {
+        this._fetcher = undefined;
+        if (!result) {
+          this.lock = false;
           return;
         }
 
-        //this._log([response]);
-        const json_data = JSON.parse(response);
-        if (json_data.length === 0) {
-          this._log(["Remote server error:", response]);
-          return;
+        let ounceGoldPriceData: PriceData | undefined;
+        let ounceSilverPriceData: PriceData | undefined;
+        const priceData: PriceData[] = [];
+        Object.entries(MetalMappings).forEach(([name, display]) => {
+          const data = result.get(name);
+          if (!data) {
+            this.lock = false;
+            return;
+          }
+
+          const pd = {
+            name: name,
+            index: display.name,
+            color: display.color,
+            price: data.get('price')!,
+            change: data.get('change')!,
+            pchange: data.get('pchange')!,
+          };
+
+          priceData.push(pd);
+          if (name == 'gold') {
+            ounceGoldPriceData = pd;
+          } else if (name == 'silver') {
+            ounceSilverPriceData = pd;
+          }
+        });
+
+        const gold = this._settings.get_int('gold-ownership');
+        if (gold > 0 && ounceGoldPriceData) {
+          const goldType = this._settings.get_int('gold-ownership-unit');
+          const ownedGold: PriceData = {
+            name: 'gold',
+            index: 'OG',
+            color: MetalMappings.gold.color,
+            price: this._get_unit_price_from_ounce(ounceGoldPriceData.price, goldType) * gold,
+            change: this._get_unit_price_from_ounce(ounceGoldPriceData.change, goldType) * gold,
+            pchange: ounceGoldPriceData.pchange,
+          };
+          priceData.push(ownedGold);
+        }
+        const silver = this._settings.get_int('silver-ownership');
+        if (silver > 0 && ounceSilverPriceData) {
+          const silverType = this._settings.get_int('silver-ownership-unit');
+          const ownedSilver: PriceData = {
+            name: 'silver',
+            index: 'OS',
+            color: MetalMappings.silver.color,
+            price: this._get_unit_price_from_ounce(ounceSilverPriceData.price, silverType) * silver,
+            change: this._get_unit_price_from_ounce(ounceSilverPriceData.change, silverType) * silver,
+            pchange: ounceSilverPriceData.pchange,
+          };
+          priceData.push(ownedSilver);
         }
 
-        let item = json_data['items'][0];
-
-        this._au_price = Number.parseFloat(item['xauPrice']);
-        this._au_change = Number.parseFloat(item['chgXau']);
-        this._au_pchange = Number.parseFloat(item['pcXau']);
-        this._ag_price = Number.parseFloat(item['xagPrice']);
-        this._ag_change = Number.parseFloat(item['chgXag']);
-        this._ag_pchange = Number.parseFloat(item['pcXag']);
-
+        this._priceData = priceData;
         this.lastUpdate.label_actor.text = "Last update: " + new Date().toLocaleTimeString();
         const next_update = Date.now() + this._get_refresh_interval() * 60 * 1000;
         const next_update_str = new Date(next_update).toLocaleTimeString();
         this.refreshBtn.label.set_text(`Refresh [Next update: ${next_update_str}]`);
 
+        this.lock = false;
         this._show_data();
-      });
-      this.lock = false;
+      }));
     }
 
     _log(logs: string[]) {
-      console.log("[GoldPriceMonitor]", logs.join(", "));
-      // Main.notifyError("GoldPriceMonitor", logs.join(", "));
+      if (this._settings?.get_boolean('enable-debug-logging')) {
+        console.log("[PriceMonitor]", logs.join(", "));
+      }
     }
 
     destroy() {
+      if (this._fetcher) {
+        this._fetcher.disable();
+        this._fetcher = undefined;
+      }
       // Remove the background taks
       GLib.source_remove(this.backgroundTask);
       GLib.source_remove(this.showTask);
@@ -212,14 +274,17 @@ const Indicator = GObject.registerClass(
   }
 );
 
-export default class GoldPriceIndicatorExtension extends Extension {
+export default class PriceIndicatorExtension extends Extension {
+  private _settings?: Gio.Settings;
+  private _indicator?: Indicator;
+
   enable() {
     this._settings = this.getSettings();
-    this._indicator = new Indicator(this);
-    this.addToPanel(this._settings.get_value("panel-position").unpack());
+    this._indicator = new Indicator(this, this._settings!);
+    this.addToPanel(this._settings!.get_int('panel-position'));
 
-    ["gold-weight-unit", "silver-weight-unit", "currency", "refresh-interval", "panel-position"].forEach((key) => {
-      this._settings.connect(`changed::${key}`, () => {
+    ["refresh-interval", "panel-position"].forEach((key) => {
+      this._settings!.connect(`changed::${key}`, () => {
         this.disable();
         this.enable();
       });
@@ -229,12 +294,12 @@ export default class GoldPriceIndicatorExtension extends Extension {
   disable() {
     if (this._indicator) {
       this._indicator.destroy();
-      this._indicator = null;
+      this._indicator = undefined;
     }
-    this._settings = null;
+    this._settings = undefined;
   }
 
-  addToPanel(indicator_position) {
+  addToPanel(indicator_position: number) {
     switch (indicator_position) {
       case 0:
         Main.panel.addToStatusArea(this.uuid, this._indicator, Main.panel._leftBox.get_children().length, "left");

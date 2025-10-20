@@ -3,7 +3,7 @@ import { build } from "esbuild";
 import { type } from "os";
 
 await build({
-  entryPoints: ["src/extension.ts", "src/prefs.ts", "src/currencies.ts"],
+  entryPoints: ["src/extension.ts", "src/prefs.ts"],
   outdir: "dist/",
   bundle: true,
   target: "firefox115",
