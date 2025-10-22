@@ -2,7 +2,7 @@
   "name": "Price Monitor",
   "description": "A Gnome extension helps you tracking precious metal price in realtime. Service provider: goldprice.org.",
   "uuid": "price-monitor-neerajcd@gmail.com",
-  "shell-version": ["45", "46", "47", "48"],
+  "shell-version": ["45", "46", "47", "48", "49"],
   "url": "https://github.com/homebackend/gnome-ext-price-monitor",
   "settings-schema": "org.gnome.shell.extensions.price-monitor"
 }

@@ -1,6 +1,6 @@
 {
   "name": "gnome-ext-price-monitor",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "A Gnome extension helps you tracking precious metal price in realtime. Service provider: goldprice.org.",
   "main": "dist/extension.js",
   "scripts": {
