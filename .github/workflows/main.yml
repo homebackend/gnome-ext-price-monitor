@@ -5,7 +5,7 @@ name: CI/CD Release
 on:
   push:
     branches:
-      - main
+      - master
     paths:
       - 'package.json'
   # This event allows you to run the workflow manually from the Actions tab.
