@@ -262,6 +262,7 @@ const Indicator = GObject.registerClass(
     }
 
     destroy() {
+      this.lock = false;
       if (this._fetcher) {
         this._fetcher.disable();
         this._fetcher = undefined;

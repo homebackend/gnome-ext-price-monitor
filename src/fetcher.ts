@@ -50,70 +50,91 @@ export class Fetcher {
     fetch(settings: Gio.Settings, callback: (result: Map<string, Map<string, number>> | undefined) => void) {
         let msg = this._build_req(settings);
         this._httpSession = new Soup.Session();
-        this._httpSession.send_and_read_async(msg, GLib.PRIORITY_DEFAULT, null, (_, r) => {
+
+        const cancellable = new Gio.Cancellable();
+        const timeoutId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 10, () => {
+            this._log(['Request timed out manually after 10s']);
+            cancellable.cancel();
+            return GLib.SOURCE_REMOVE;
+        });
+
+        this._httpSession.send_and_read_async(msg, GLib.PRIORITY_DEFAULT, cancellable as any, (_, r) => {
+            GLib.source_remove(timeoutId);
+
             if (!this._httpSession) {
                 this._log(['_httpSession is undefined']);
                 return callback(undefined);
             }
 
-            const bytes = this._httpSession!.send_and_read_finish(r).get_data();
-            if (!bytes) {
-                this._log(['Invalid response from server']);
-                this._httpSession = undefined;
-                return callback(undefined);
-            }
-
-            this._log(['Recieved response']);
-
-            this._httpSession = undefined;
-            const response = new TextDecoder("utf-8").decode(bytes);
-
-            if (msg.get_status() > 299) {
-                this._log(["Remote server error:", msg.get_status().toString(), response]);
-                return callback(undefined);
-            }
-
-            let data: any;
-            if (this._source.parser == Parsers.Json) {
-                data = JSON.parse(response);
-                if (data.length === 0) {
-                    this._log(["Remote server error:", response]);
+            try {
+                const bytes = this._httpSession!.send_and_read_finish(r).get_data();
+                if (!bytes) {
+                    this._log(['Invalid response from server']);
+                    this._httpSession = undefined;
                     return callback(undefined);
                 }
-            } else if (this._source.parser == Parsers.NewLineWithTabs) {
-                const rows: string[] = response.split('\n');
-                data = rows.map(row => row.split('\t'));
-            } else {
-                this._log(['Unsupported parser']);
-                return callback(undefined);
-            }
 
-            const items = this._source.getItems(data);
-            const result: Map<string, Map<string, number>> = new Map();
-            this._source.commodities.forEach((c, names) => {
-                names = Array.isArray(names) ? names : [names];
-                names.forEach(name => {
-                    if (!items.has(name)) {
-                        this._log(['Not found', name]);
-                        return;
-                    }
+                this._log(['Recieved response']);
 
-                    const item = items.get(name);
-                    const r: Map<string, number> = new Map();
-                    if (this._source.parser == Parsers.Json) {
-                        const commodity = c as JsonCommodity;
-                        this._get_value(r, item, 'price', commodity.price);
-                        this._get_value(r, item, 'change', commodity.change);
-                        this._get_value(r, item, 'pchange', commodity.pchange);
-                        this._get_value(r, item, 'close', commodity.close);
-                        this._get_value(r, item, 'gratio', commodity.goldRatio);
-                        this._get_value(r, item, 'unit', commodity.unit);
+                this._httpSession = undefined;
+                const response = new TextDecoder("utf-8").decode(bytes);
+
+                if (msg.get_status() > 299) {
+                    this._log(["Remote server error:", msg.get_status().toString(), response]);
+                    return callback(undefined);
+                }
+
+                let data: any;
+                if (this._source.parser == Parsers.Json) {
+                    data = JSON.parse(response);
+                    if (data.length === 0) {
+                        this._log(["Remote server error:", response]);
+                        return callback(undefined);
                     }
-                    result.set(name, r);
+                } else if (this._source.parser == Parsers.NewLineWithTabs) {
+                    const rows: string[] = response.split('\n');
+                    data = rows.map(row => row.split('\t'));
+                } else {
+                    this._log(['Unsupported parser']);
+                    return callback(undefined);
+                }
+
+                const items = this._source.getItems(data);
+                const result: Map<string, Map<string, number>> = new Map();
+                this._source.commodities.forEach((c, names) => {
+                    names = Array.isArray(names) ? names : [names];
+                    names.forEach(name => {
+                        if (!items.has(name)) {
+                            this._log(['Not found', name]);
+                            return;
+                        }
+
+                        const item = items.get(name);
+                        const r: Map<string, number> = new Map();
+                        if (this._source.parser == Parsers.Json) {
+                            const commodity = c as JsonCommodity;
+                            this._get_value(r, item, 'price', commodity.price);
+                            this._get_value(r, item, 'change', commodity.change);
+                            this._get_value(r, item, 'pchange', commodity.pchange);
+                            this._get_value(r, item, 'close', commodity.close);
+                            this._get_value(r, item, 'gratio', commodity.goldRatio);
+                            this._get_value(r, item, 'unit', commodity.unit);
+                        }
+                        result.set(name, r);
+                    });
                 });
-            });
 
-            callback(result);
+                callback(result);
+            } catch (e) {
+                if (e instanceof Error) {
+                    this._log(['Fetch failed or timed out:', e.message]);
+                } else {
+                    this._log(['An unknown error occurred']);
+                }
+                return callback(undefined);
+            } finally {
+                this._httpSession = undefined;
+            }
         });
     }
 

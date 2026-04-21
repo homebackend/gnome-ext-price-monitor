@@ -11,7 +11,7 @@ npm run build
 rm -rf "$DEST_DIR"
 
 mkdir -p "$DEST_DIR"
-cp dist/{extension,currencies,prefs}.js "$DEST_DIR"
+cp dist/{extension,prefs}.js "$DEST_DIR"
 cp src/metadata.json "$DEST_DIR/metadata.json"
 cp -r src/schemas "$DEST_DIR"
 
